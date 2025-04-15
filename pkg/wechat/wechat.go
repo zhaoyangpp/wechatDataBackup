@@ -310,6 +310,7 @@ func exportWeChatVideoAndFile(info WeChatInfo, expPath string, progress chan<- s
 	videoRootPath := info.FilePath + "\\FileStorage\\Video"
 	fileRootPath := info.FilePath + "\\FileStorage\\File"
 	cacheRootPath := info.FilePath + "\\FileStorage\\Cache"
+
 	rootPaths := []string{videoRootPath, fileRootPath, cacheRootPath}
 
 	handleNumber := int64(0)
@@ -326,6 +327,9 @@ func exportWeChatVideoAndFile(info WeChatInfo, expPath string, progress chan<- s
 	go func() {
 		for _, rootPath := range rootPaths {
 			log.Println(rootPath)
+			if _, err := os.Stat(rootPath); err != nil {
+				continue
+			}
 			err := filepath.Walk(rootPath, func(path string, finfo os.FileInfo, err error) error {
 				if err != nil {
 					log.Printf("filepath.Walk：%v\n", err)
@@ -399,43 +403,51 @@ func exportWeChatVideoAndFile(info WeChatInfo, expPath string, progress chan<- s
 func exportWeChatBat(info WeChatInfo, expPath string, progress chan<- string) {
 	progress <- "{\"status\":\"processing\", \"result\":\"export WeChat Dat start\", \"progress\": 21}"
 	datRootPath := info.FilePath + "\\FileStorage\\MsgAttach"
-	fileInfo, err := os.Stat(datRootPath)
-	if err != nil || !fileInfo.IsDir() {
-		progress <- fmt.Sprintf("{\"status\":\"error\", \"result\":\"%s error\"}", datRootPath)
-		return
-	}
+	imageRootPath := info.FilePath + "\\FileStorage\\Image"
+	rootPaths := []string{datRootPath, imageRootPath}
 
 	handleNumber := int64(0)
-	fileNumber := getPathFileNumber(datRootPath, ".dat")
+	fileNumber := int64(0)
+	for i := range rootPaths {
+		fileNumber += getPathFileNumber(rootPaths[i], ".dat")
+	}
+	log.Println("DatFileNumber ", fileNumber)
+
 	var wg sync.WaitGroup
 	var reportWg sync.WaitGroup
 	quitChan := make(chan struct{})
 	taskChan := make(chan [2]string, 100)
 	go func() {
-		err = filepath.Walk(datRootPath, func(path string, finfo os.FileInfo, err error) error {
-			if err != nil {
-				log.Printf("filepath.Walk：%v\n", err)
-				return err
+		for i := range rootPaths {
+			if _, err := os.Stat(rootPaths[i]); err != nil {
+				continue
 			}
 
-			if !finfo.IsDir() && strings.HasSuffix(path, ".dat") {
-				expFile := expPath + path[len(info.FilePath):]
-				_, err := os.Stat(filepath.Dir(expFile))
+			err := filepath.Walk(rootPaths[i], func(path string, finfo os.FileInfo, err error) error {
 				if err != nil {
-					os.MkdirAll(filepath.Dir(expFile), 0644)
+					log.Printf("filepath.Walk：%v\n", err)
+					return err
 				}
 
-				task := [2]string{path, expFile}
-				taskChan <- task
+				if !finfo.IsDir() && strings.HasSuffix(path, ".dat") {
+					expFile := expPath + path[len(info.FilePath):]
+					_, err := os.Stat(filepath.Dir(expFile))
+					if err != nil {
+						os.MkdirAll(filepath.Dir(expFile), 0644)
+					}
+
+					task := [2]string{path, expFile}
+					taskChan <- task
+					return nil
+				}
+
 				return nil
+			})
+
+			if err != nil {
+				log.Println("filepath.Walk:", err)
+				progress <- fmt.Sprintf("{\"status\":\"error\", \"result\":\"%v\"}", err)
 			}
-
-			return nil
-		})
-
-		if err != nil {
-			log.Println("filepath.Walk:", err)
-			progress <- fmt.Sprintf("{\"status\":\"error\", \"result\":\"%v\"}", err)
 		}
 		close(taskChan)
 	}()
@@ -445,7 +457,7 @@ func exportWeChatBat(info WeChatInfo, expPath string, progress chan<- string) {
 		go func() {
 			defer wg.Done()
 			for task := range taskChan {
-				_, err = os.Stat(task[1])
+				_, err := os.Stat(task[1])
 				if err == nil {
 					atomic.AddInt64(&handleNumber, 1)
 					continue

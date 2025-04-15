@@ -182,6 +182,7 @@ type WeChatMessage struct {
 }
 
 type WeChatMessageList struct {
+	MsgType string          `json:"MsgType"`
 	KeyWord string          `json:"KeyWord"`
 	Total   int             `json:"Total"`
 	Rows    []WeChatMessage `json:"Rows"`
@@ -692,6 +693,7 @@ func (P *WechatDataProvider) WeChatGetMessageListByKeyWord(userName string, time
 	List := &WeChatMessageList{}
 	List.Rows = make([]WeChatMessage, 0)
 	List.KeyWord = keyWord
+	List.MsgType = msgType
 	_time := time
 	selectPagesize := pageSize
 	if keyWord != "" || msgType != "" {
@@ -732,6 +734,7 @@ func (P *WechatDataProvider) WeChatGetMessageListByType(userName string, time in
 
 	List := &WeChatMessageList{}
 	List.Rows = make([]WeChatMessage, 0)
+	List.MsgType = msgType
 	selectTime := time
 	selectpageSize := 30
 	needSize := pageSize

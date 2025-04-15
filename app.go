@@ -23,7 +23,7 @@ const (
 	configDefaultUserKey = "userConfig.defaultUser"
 	configUsersKey       = "userConfig.users"
 	configExportPathKey  = "exportPath"
-	appVersion           = "v1.2.3"
+	appVersion           = "v1.2.4"
 )
 
 type FileLoader struct {

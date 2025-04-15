@@ -31,3 +31,4 @@ User
 config.json
 wechatDataBackup.exe
 app.log
+app-*.log
